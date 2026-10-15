@@ -1,0 +1,55 @@
+name: Build
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Sürümü etiketten ayarla
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          $v = $env:TAG.TrimStart('v')
+          npm version $v --no-git-tag-version --allow-same-version
+          $env:EXPECTED = $v
+          node -e "const v=require('./package.json').version; if (v !== process.env.EXPECTED) { process.exit(1); }"
+      - run: npm run build
+      - name: Kurulum dosyası kontrolü ve SHA256 özeti
+        shell: pwsh
+        run: |
+          # DÜZELTME: Dosya adında boşluk veya tire olsa bile yakalaması için jokerleri genişlettik
+          $f = Get-ChildItem -Path dist -Filter "*.exe" | Where-Object { $_.Name -like "*Launcher*Setup*" } | Select-Object -First 1
+          if (-not $f) { throw "Kurulum dosyası üretilmedi" }
+          if (-not (Test-Path dist\latest.yml)) { throw "latest.yml üretilmedi" }
+          $h = (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLower()
+          "$h  $($f.Name)" | Out-File -Encoding ascii dist\SHA256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+
+          name: GTA-World-Türkiye-Launcher
+          path: |
+            dist/*Launcher*Setup*.exe
+            dist/latest.yml
+            dist/SHA256.txt
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            dist/*Launcher*Setup*.exe
+            dist/latest.yml
+            dist/SHA256.txt

@@ -1,0 +1,47 @@
+{
+  "name": "gta-world-tr-launcher",
+  "version": "1.0.0",
+  "description": "GTA World Türkiye Launcher",
+  "author": "GTA World Türkiye",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win nsis --publish never"
+  },
+  "dependencies": {
+    "@xhayper/discord-rpc": "^1.5.1",
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "electron": "33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "world.gta.tr.launcher",
+    "productName": "GTA World Turkiye Launcher",
+    "artifactName": "GTA-World-Türkiye-Launcher-Setup-v${version}.exe",
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "logo.png",
+      "icon.ico",
+      "bg*.jpg"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "GTA World Türkiye Launcher",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "language": "1055"
+    }
+  }
+}
