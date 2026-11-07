@@ -23,6 +23,28 @@ const LOG = path.join(app.getPath("userData"), "launcher.log");
 function log(msg) { try { fs.appendFileSync(LOG, new Date().toISOString() + " " + msg + "\n"); } catch {} }
 process.on("uncaughtException", (e) => log("HATA: " + (e && e.stack || e)));
 
+// ---- Kullanıcı ayarları: %APPDATA%\\gtaworld-tr-launcher\\settings.json ----
+const SETTINGS_FILE = path.join(app.getPath("userData"), "settings.json");
+const DEFAULTS = { closeAfterConnect: true, discordRpc: true, bgSlideshow: true, bgSeconds: 8, refreshSeconds: 30 };
+const RULES = {
+  closeAfterConnect: (v) => typeof v === "boolean",
+  discordRpc: (v) => typeof v === "boolean",
+  bgSlideshow: (v) => typeof v === "boolean",
+  bgSeconds: (v) => [5, 8, 15].includes(v),
+  refreshSeconds: (v) => [15, 30, 60].includes(v)
+};
+function loadSettings() {
+  let s = {};
+  try { s = JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8")); } catch {}
+  const out = { ...DEFAULTS };
+  for (const k of Object.keys(RULES)) if (RULES[k](s[k])) out[k] = s[k];
+  return out;
+}
+function saveSettings() {
+  try { fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2)); } catch (e) { log("ayar kaydedilemedi: " + e.message); }
+}
+let settings = loadSettings();
+
 let win = null, tray = null, quitting = false, keepAlive = false;
 let launcherRpc = null, gameRpc = null, gameTimer = null, phase = "idle", closeAfterConnect = false;
 const startedAt = Date.now();
@@ -69,8 +91,7 @@ let gameStart = 0;
 function switchToGame() {
   phase = "game"; gameStart = Date.now(); log("oyun işlemi bulundu, oyun RPC'sine geçildi");
   if (launcherRpc) { launcherRpc.destroy(); launcherRpc = null; }
-  gameRpc = rpcClient(CFG.gameAppId);
-  updateGame();
+  if (settings.discordRpc) { gameRpc = rpcClient(CFG.gameAppId); updateGame(); }
   gameTimer = setInterval(updateGame, 30000);
   if (closeAfterConnect && live()) setTimeout(closeWindowKeepRpc, 1500);   
 }
@@ -90,9 +111,12 @@ async function fivemProcs(cb) {
 const joinedTitle = (t) => /fivem.{0,4}by cfx\.re\s*[-–—]\s*\S/i.test(t || "");
 function backToLauncher() {
   clearInterval(gameTimer);
+  destroyTray(); keepAlive = false;
   if (gameRpc) { gameRpc.destroy(); gameRpc = null; }
-  if (!launcherRpc) launcherRpc = rpcClient(CFG.launcherAppId);
-  launcherRpc.set(launcherActivity("Launcher'da Bekliyor"));
+  if (settings.discordRpc) {
+    if (!launcherRpc) launcherRpc = rpcClient(CFG.launcherAppId);
+    launcherRpc.set(launcherActivity("Launcher'da Bekliyor"));
+  }
   if (live()) win.webContents.send("connect-reset");
 }
 function endSession(why) {
@@ -132,6 +156,7 @@ function create() {
   });
   win.setMenu(null);
   win.loadFile("index.html");
+  win.webContents.on("did-finish-load", () => { if (phase === "game" && live()) win.webContents.send("game-state", true); });
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https:\/\//.test(url)) shell.openExternal(url);
     return { action: "deny" };
@@ -139,24 +164,145 @@ function create() {
 }
 
 
-function closeWindowKeepRpc() {
-  keepAlive = true;
+// Ayarlardan Discord durumu açılıp kapatılınca RPC istemcilerini duruma göre yeniden kurar
+function applyRpc() {
+  if (quitting) return;
+  refreshTray();
+  if (!settings.discordRpc) {
+    if (launcherRpc) { launcherRpc.destroy(); launcherRpc = null; }
+    if (gameRpc) { gameRpc.destroy(); gameRpc = null; }
+    return;
+  }
+  if (phase === "game") {
+    if (!gameRpc) { gameRpc = rpcClient(CFG.gameAppId); updateGame(); }
+  } else if (!launcherRpc) {
+    launcherRpc = rpcClient(CFG.launcherAppId);
+    launcherRpc.set(launcherActivity(phase === "connecting" ? "Sunucuya Bağlanıyor" : "Launcher'da Bekliyor"));
+  }
+}
+
+// ---- Sistem tepsisi: Discord Durumu (Açık/Kapalı), Launcher'ı Aç, Kapat ----
+function trayMenu() {
+  return Menu.buildFromTemplate([
+    { label: "Discord Durumu: " + (settings.discordRpc ? "Açık" : "Kapalı"), click: () => updateSettings({ discordRpc: !settings.discordRpc }, true) },
+    { label: "Launcher'ı Aç", click: openLauncher },
+    { type: "separator" },
+    { label: "Kapat", click: () => quitApp("tepsi menüsü") }
+  ]);
+}
+function refreshTray() {
+  if (!tray) return;
+  try {
+    tray.setToolTip("GTAW Türkiye Launcher: Discord durumu " + (settings.discordRpc ? "çalışıyor" : "kapalı"));
+    tray.setContextMenu(trayMenu());
+  } catch (e) { log("tepsi güncelleme hatası: " + e); }
+}
+function ensureTray() {
+  if (tray) return true;
   try {
     tray = new Tray(nativeImage.createFromPath(path.join(__dirname, "icon.ico")));
-    tray.setToolTip("GTAW Türkiye Launcher: Discord durumu çalışıyor");
-    tray.setContextMenu(Menu.buildFromTemplate([{ label: "Discord durumunu kapat ve çık", click: () => quitApp("tepsi menüsü") }]));
-  } catch (e) { log("tepsi hatası: " + e); }
+    tray.on("click", openLauncher);
+    refreshTray();
+    return true;
+  } catch (e) { log("tepsi hatası: " + e); tray = null; return false; }
+}
+function destroyTray() { try { tray && tray.destroy(); } catch {} tray = null; }
+function openLauncher() {
+  if (!live()) create();
+  else { if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
+}
+
+function closeWindowKeepRpc() {
+  if (!settings.discordRpc) return quitApp("bağlanınca kapat (Discord durumu kapalı)");
+  if (!ensureTray()) { log("tepsi kurulamadı, pencere açık bırakıldı"); return; }
+  keepAlive = true;
   if (live()) win.destroy();
   log("pencere kapatıldı, arka planda RPC devam ediyor");
 }
 
 ipcMain.handle("app-version", () => app.getVersion());
+
+ipcMain.handle("settings-get", () => settings);
+function updateSettings(patch, notifyWindow) {
+  if (!patch || typeof patch !== "object") return settings;
+  const prev = settings, next = { ...settings };
+  for (const k of Object.keys(patch)) if (RULES[k] && RULES[k](patch[k])) next[k] = patch[k];
+  settings = next; saveSettings();
+  if (phase === "connecting") closeAfterConnect = next.closeAfterConnect;
+  if (next.discordRpc !== prev.discordRpc) applyRpc();
+  if (notifyWindow && live()) win.webContents.send("settings-changed", settings);
+  return settings;
+}
+ipcMain.handle("settings-set", (_e, patch) => updateSettings(patch, false));
+ipcMain.handle("settings-reset", () => {
+  const prev = settings;
+  settings = { ...DEFAULTS }; saveSettings();
+  if (phase === "connecting") closeAfterConnect = settings.closeAfterConnect;
+  if (settings.discordRpc !== prev.discordRpc) applyRpc();
+  return settings;
+});
+ipcMain.handle("open-log", () => {
+  if (fs.existsSync(LOG)) { shell.showItemInFolder(LOG); return true; }
+  shell.openPath(app.getPath("userData")); return true;
+});
+
+// FiveM klasörlerini açar. mods ve plugins yoksa oluşturulur.
+// Yol arayüzden alınmaz, sadece bu sabit listeden seçilir.
+const FIVEM_DIRS = { app: "", mods: "mods", plugins: "plugins" };
+ipcMain.handle("fivem-open-folder", async (_e, name) => {
+  if (!Object.prototype.hasOwnProperty.call(FIVEM_DIRS, name)) return { ok: false, reason: "error" };
+  const local = process.env.LOCALAPPDATA;
+  const base = local ? path.join(local, "FiveM", "FiveM.app") : "";
+  if (!base || !fs.existsSync(base)) return { ok: false, reason: "notfound" };
+  const dir = FIVEM_DIRS[name] ? path.join(base, FIVEM_DIRS[name]) : base;
+  try {
+    let created = false;
+    if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); created = true; log("klasör oluşturuldu: " + dir); }
+    else if (!fs.statSync(dir).isDirectory()) return { ok: false, reason: "error" };
+    const err = await shell.openPath(dir);
+    if (err) { log("klasör açılamadı: " + err); return { ok: false, reason: "error" }; }
+    return { ok: true, created };
+  } catch (e) {
+    log("klasör açma hatası: " + e.message);
+    return { ok: false, reason: "error" };
+  }
+});
+
+// FiveM'in sunucu kaynak önbelleğini siler (server-cache, server-cache-priv).
+// Oyun dosyaları (cache\game) ve kullanıcı ayarlarına dokunulmaz.
+ipcMain.handle("fivem-clear-cache", async () => {
+  const local = process.env.LOCALAPPDATA;
+  const base = local ? path.join(local, "FiveM", "FiveM.app", "data") : "";
+  if (!base || !fs.existsSync(base)) return { ok: false, reason: "notfound" };
+  const running = phase !== "idle" || await new Promise((resolve) =>
+    exec("tasklist /NH /FO CSV", { windowsHide: true, timeout: 15000, maxBuffer: 8 * 1024 * 1024 }, (err, out) =>
+      resolve(!err && /"FiveM[^"]*\.exe"/i.test(String(out)))));
+  if (running) return { ok: false, reason: "running" };
+  let cleared = 0;
+  try {
+    for (const name of ["server-cache", "server-cache-priv"]) {
+      const dir = path.join(base, name);
+      if (!fs.existsSync(dir)) continue;
+      await fs.promises.rm(dir, { recursive: true, force: true });
+      cleared++;
+    }
+    log("FiveM önbelleği temizlendi (" + cleared + " klasör)");
+    return { ok: true, cleared };
+  } catch (e) {
+    log("önbellek temizleme hatası: " + e.message);
+    return { ok: false, reason: "error" };
+  }
+});
 ipcMain.on("minimize", () => live() && win.minimize());
-ipcMain.on("close", () => quitApp("kapat butonu"));
+ipcMain.on("close", () => {
+  if (tray && phase === "game" && live()) { log("pencere tepsiye alındı"); win.destroy(); return; }
+  quitApp("kapat butonu");
+});
 ipcMain.on("open-external", (_e, url, opts) => {
   if (/^https:\/\//.test(url)) return shell.openExternal(url);
   
   if (/^fivem:\/\/connect\/[A-Za-z0-9._:\/-]+$/.test(url)) {
+    if (phase === "game") return;
     log("Sunucuya Bağlan tıklandı");
     if (launcherRpc) launcherRpc.set(launcherActivity("Sunucuya Bağlanıyor"));
     try {
@@ -165,7 +311,7 @@ ipcMain.on("open-external", (_e, url, opts) => {
       p.unref();
     } catch { shell.openExternal(url); }
     phase = "connecting"; startWatch();
-    closeAfterConnect = !!(opts && opts.closeAfter);
+    closeAfterConnect = settings.closeAfterConnect;
   }
 });
 
@@ -228,12 +374,14 @@ ipcMain.handle("update-apply", async () => {
 app.on("second-instance", () => { if (!live()) create(); else { win.show(); if (win.isMinimized()) win.restore(); win.focus(); } });
 app.whenReady().then(() => {
   create();
-  launcherRpc = rpcClient(CFG.launcherAppId);
-  launcherRpc.set(launcherActivity("Launcher'da Bekliyor"));
+  if (settings.discordRpc) {
+    launcherRpc = rpcClient(CFG.launcherAppId);
+    launcherRpc.set(launcherActivity("Launcher'da Bekliyor"));
+  }
 });
 app.on("before-quit", () => {
   quitting = true; log("before-quit");
   clearInterval(gameTimer);
   try { launcherRpc && launcherRpc.destroy(); gameRpc && gameRpc.destroy(); tray && tray.destroy(); } catch {}
 });
-app.on("window-all-closed", () => { if (keepAlive) log("pencere kapandı, arka planda devam"); else quitApp("window-all-closed"); });
+app.on("window-all-closed", () => { if (keepAlive && phase === "game") log("pencere kapandı, arka planda devam"); else quitApp("window-all-closed"); });

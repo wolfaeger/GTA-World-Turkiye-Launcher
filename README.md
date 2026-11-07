@@ -9,6 +9,8 @@ GTA World Türkiye sunucusuna tek tıkla bağlanmak için hazırlanmış masaüs
 - Yeni oyuncular için hesap açma ve başvuru rehberi
 - Discord Rich Presence (launcher ve oyun içi durum)
 - Otomatik güncelleme
+- Sunucuya bağlanınca tepside çalışır: sağ tık menüsünden Discord durumu aç/kapat, launcher'ı aç, kapat
+- Ayarlar penceresi: Discord durumu, bağlanınca kapat, arka plan ve yenileme seçenekleri, FiveM önbellek temizleme
 
 ## İndirme ve kurulum
 1. [Releases](../../releases/latest) sayfasından `GTA-World-Türkiye-Launcher-Setup-vX.X.X.exe` dosyasını indirin.
@@ -43,6 +45,8 @@ npm run build      # dist/ içinde kurulum dosyasını üretir (Windows'ta)
 
 ## Ayarlar
 Adresler ve davranışlar `index.html` içindeki `CONFIG` bölümünde, Discord RPC ayarları `main.js` başındaki `CFG` bölümünde, güncelleme deposu `package.json` içindeki `build.publish` bölümünde bulunur.
+
+Kullanıcı ayarları `%APPDATA%\\gtaworld-tr-launcher\\settings.json` dosyasında saklanır. Launcher içindeki Ayarlar penceresinden değiştirilir.
 
 ## Kayıt dosyası
 Sorun çıkarsa launcher olayları `%APPDATA%\gtaworld-tr-launcher\launcher.log` dosyasına yazılır.

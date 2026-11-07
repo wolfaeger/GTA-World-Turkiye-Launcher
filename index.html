@@ -104,6 +104,22 @@ body{background:transparent;color:var(--text);font-family:"Segoe UI",system-ui,s
 @media(prefers-reduced-motion:reduce){.updot{animation:none}}
 .foot{padding:4px 12px;border-radius:12px;background:rgba(16,24,40,.42);-webkit-backdrop-filter:blur(16px) saturate(1.3);backdrop-filter:blur(16px) saturate(1.3);border:1px solid rgba(255,255,255,.14);z-index:1}
 .foot{position:absolute;bottom:14px;right:32px;font-size:12px;color:var(--mute)}
+.set{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:12px 0}
+.set+.set{border-top:1px solid rgba(255,255,255,.1)}
+.set b{display:block;font-size:14px;color:var(--text);font-weight:600}
+.set small{display:block;color:var(--mute);font-size:12.5px;line-height:1.45;margin-top:2px;max-width:46ch}
+.sw{position:relative;flex:none;width:44px;height:26px;padding:0;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.1);cursor:pointer;transition:background .2s,border-color .2s}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .2s,background .2s}
+.sw[aria-checked="true"]{background:var(--accent);border-color:var(--accent)}
+.sw[aria-checked="true"]::after{transform:translateX(18px);background:#1a1205}
+.sw:focus-visible,.tab:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.seg{display:flex;gap:6px;flex:none}
+.seg .tab,.sheet .act{padding:7px 13px}
+.set.dim{opacity:.45;pointer-events:none}
+.tab.danger:hover{border-color:#e5222b;color:#fff;background:rgba(229,34,43,.25)}
+.tab.danger.arm{border-color:#e5222b;background:#e5222b;color:#fff}
+.tab[disabled]{opacity:.45;cursor:not-allowed}
+.msg{min-height:20px;margin-top:8px;font-size:13px;color:var(--mute)}
 @media(max-width:720px){.app{grid-template-columns:1fr;aspect-ratio:auto;padding:22px}.foot{position:static}}
 @media(prefers-reduced-motion:reduce){.on .dot,.off .dot{animation:none}}
 </style>
@@ -112,6 +128,7 @@ body{background:transparent;color:var(--text);font-family:"Segoe UI",system-ui,s
 <main class="app">
   <div class="win">
     <a class="dc" href="https://discord.gg/gtaworldtr" target="_blank" rel="noopener" title="Discord'a katıl" aria-label="Discord'a katıl"><img src="data:image/png;base64,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" alt="Discord"></a>
+    <button class="winbtn" id="btnSettings" title="Ayarlar" aria-label="Ayarlar"><svg viewBox="0 0 24 24" style="stroke-width:2;stroke-linejoin:round;width:16px;height:16px"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
     <button class="winbtn" id="btnMin" title="Aşağı al" aria-label="Aşağı al"><svg viewBox="0 0 14 14"><path d="M2 10h10"/></svg></button>
     <button class="winbtn x" id="btnClose" title="Kapat" aria-label="Kapat"><svg viewBox="0 0 14 14"><path d="M2 2l10 10M12 2L2 12"/></svg></button>
   </div>
@@ -193,6 +210,33 @@ body{background:transparent;color:var(--text);font-family:"Segoe UI",system-ui,s
       </section>
     </div>
   </div>
+  <div class="modal" id="settings" hidden>
+    <div class="sheet" role="dialog" aria-label="Ayarlar">
+      <button class="winbtn x gx" id="settingsClose" aria-label="Kapat"><svg viewBox="0 0 14 14"><path d="M2 2l10 10M12 2L2 12"/></svg></button>
+      <h2>Ayarlar</h2>
+      <p>Değişiklikler anında uygulanır ve otomatik kaydedilir.</p>
+
+      <h3>Genel</h3>
+      <div class="set"><div><b>Bağlanınca launcher'ı kapat</b><small>Sunucuya girdiğinde pencere kapanır. Discord durumu açıksa arka planda çalışmaya devam eder.</small></div><button class="sw" type="button" role="switch" data-k="closeAfterConnect" aria-label="Bağlanınca launcher'ı kapat"></button></div>
+      <div class="set"><div><b>Discord durumu</b><small>Launcher'da ve oyundayken Discord profilinde GTA World Türkiye durumunu gösterir.</small></div><button class="sw" type="button" role="switch" data-k="discordRpc" aria-label="Discord durumu"></button></div>
+
+      <h3>Görünüm</h3>
+      <div class="set"><div><b>Arka plan slayt gösterisi</b><small>Kapalıyken arka plan sabit kalır.</small></div><button class="sw" type="button" role="switch" data-k="bgSlideshow" aria-label="Arka plan slayt gösterisi"></button></div>
+      <div class="set" id="bgSecRow"><div><b>Slayt hızı</b><small>Arka plan resminin değişme süresi.</small></div><div class="seg" data-k="bgSeconds"><button class="tab" type="button" data-v="5">5 sn</button><button class="tab" type="button" data-v="8">8 sn</button><button class="tab" type="button" data-v="15">15 sn</button></div></div>
+
+      <h3>Sunucu durumu</h3>
+      <div class="set"><div><b>Yenileme aralığı</b><small>Oyuncu sayısı ve servis durumları ne sıklıkla kontrol edilsin.</small></div><div class="seg" data-k="refreshSeconds"><button class="tab" type="button" data-v="15">15 sn</button><button class="tab" type="button" data-v="30">30 sn</button><button class="tab" type="button" data-v="60">60 sn</button></div></div>
+
+      <h3>FiveM klasörleri</h3>
+      <div class="set"><div><b>Klasörü aç</b><small>mods ve plugins klasörleri yoksa tıklayınca oluşturulur.</small></div><div class="seg" id="folderBtns"><button class="tab" type="button" data-f="app">FiveM.app</button><button class="tab" type="button" data-f="mods">mods</button><button class="tab" type="button" data-f="plugins">plugins</button></div></div>
+
+      <h3>Bakım</h3>
+      <div class="set"><div><b>FiveM önbelleğini temizle</b><small>Sunucu kaynak önbelleğini siler. Takılma, eski dosya veya yükleme hatalarında işe yarar. Sonraki bağlanışta sunucu dosyaları yeniden indirilir.</small></div><button class="tab danger" type="button" id="clearCache">Temizle</button></div>
+      <div class="set"><div><b>Kayıt dosyası</b><small>Sorun bildirirken yetkililere göndermek için launcher.log dosyasını gösterir.</small></div><button class="tab" type="button" id="openLog">Klasörde göster</button></div>
+      <div class="set"><div><b>Ayarları sıfırla</b><small>Tüm ayarlar varsayılan değerlere döner.</small></div><button class="tab" type="button" id="resetSettings">Sıfırla</button></div>
+      <div class="msg" id="maintMsg" role="status"></div>
+    </div>
+  </div>
 </main>
 
 <script>
@@ -201,7 +245,7 @@ const CONFIG = {
   serverAddress: "cfx.re/join/3yybopy",
   checkSeconds: 30,
   closeAfterConnect: true,
-  allTimeBase: 534,
+  allTimeBase: 547,
   backgrounds: ["bg1.jpg", "bg2.jpg", "bg3.jpg", "bg4.jpg", "bg5.jpg", "bg6.jpg", "bg7.jpg"],  
   backgroundSeconds: 8,
   playerCountUrl: "https://ucp-tr.gta.world/player-count",
@@ -283,15 +327,15 @@ $("btnClose").onclick = closeApp;
 
 $("connect").onclick = () => {
   const url = "fivem://connect/" + CONFIG.serverAddress;
-  if (CONFIG.closeAfterConnect) { connectingUi = true; renderConnect(); }
-  if (api && api.openExternal) { api.openExternal(url, { closeAfter: CONFIG.closeAfterConnect }); return; }
+  if (S.closeAfterConnect) { connectingUi = true; renderConnect(); }
+  if (api && api.openExternal) { api.openExternal(url, { closeAfter: S.closeAfterConnect }); return; }
   window.location.href = url;
-  if (CONFIG.closeAfterConnect) setTimeout(closeApp, 1500);
+  if (S.closeAfterConnect) setTimeout(closeApp, 1500);
 };
 
 
-(function(){
-  const list = CONFIG.backgrounds; if (!list.length) return;
+const bg = (function(){
+  const list = CONFIG.backgrounds; if (!list.length) return { slides(){} };
   const app = document.querySelector(".app");
   const layers = [0,1].map(() => { const d = document.createElement("div"); d.className = "bgl"; return d; });
   const shade = document.createElement("div"); shade.className = "bgshade";
@@ -304,15 +348,16 @@ $("connect").onclick = () => {
     i++; k++;
   };
   show();
-  if (list.length > 1) setInterval(show, CONFIG.backgroundSeconds * 1000);
+  let timer = null;
+  return { slides(on, sec){ clearInterval(timer); timer = null; if (on && list.length > 1) timer = setInterval(show, sec * 1000); } };
 })();
 
 
-let connectingUi = false, updatingUi = false, fivemMissing = false;
+let connectingUi = false, updatingUi = false, fivemMissing = false, inGame = false;
 function renderConnect(){
   const b = $("connect");
-  b.textContent = updatingUi ? "Güncelleniyor…" : connectingUi ? "Bağlanıyor…" : "Sunucuya Bağlan";
-  b.disabled = updatingUi || connectingUi || fivemMissing;
+  b.textContent = updatingUi ? "Güncelleniyor…" : inGame ? "Oyundasın" : connectingUi ? "Bağlanıyor…" : "Sunucuya Bağlan";
+  b.disabled = updatingUi || connectingUi || inGame || fivemMissing;
   b.title = fivemMissing ? "Önce FiveM'i kurmalısın" : "";
   $("fivemNotice").hidden = !fivemMissing;
 }
@@ -329,7 +374,7 @@ const guide = $("guide");
 $("guideBtn").onclick = () => { guide.hidden = false; };
 $("guideClose").onclick = () => { guide.hidden = true; };
 guide.addEventListener("click", e => { if (e.target === guide) guide.hidden = true; });
-document.addEventListener("keydown", e => { if (e.key === "Escape") guide.hidden = true; });
+document.addEventListener("keydown", e => { if (e.key === "Escape") { guide.hidden = true; settingsPanel.hidden = true; } });
 document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
   document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
   document.querySelectorAll(".pane").forEach(p => p.hidden = p.id !== t.dataset.p);
@@ -366,17 +411,84 @@ async function updateCheck(){
 }
 
 
+// ---------- Ayarlar ----------
+const DEFAULTS = { closeAfterConnect: true, discordRpc: true, bgSlideshow: true, bgSeconds: 8, refreshSeconds: 30 };
+let S = Object.assign({}, DEFAULTS), refreshTimer = null, cacheArm = null;
+const settingsPanel = $("settings"), maintMsg = $("maintMsg");
+
+function applySettings(){
+  bg.slides(S.bgSlideshow, S.bgSeconds);
+  clearInterval(refreshTimer);
+  refreshTimer = setInterval(refresh, S.refreshSeconds * 1000);
+}
+function paintSettings(){
+  settingsPanel.querySelectorAll(".sw").forEach(b => b.setAttribute("aria-checked", String(!!S[b.dataset.k])));
+  settingsPanel.querySelectorAll(".seg").forEach(g => g.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", Number(t.dataset.v) === S[g.dataset.k])));
+  $("bgSecRow").classList.toggle("dim", !S.bgSlideshow);
+}
+async function saveSetting(k, v){
+  S[k] = v; applySettings(); paintSettings();
+  if (api && api.setSettings) { try { Object.assign(S, await api.setSettings({ [k]: v })); applySettings(); paintSettings(); } catch {} }
+}
+function say(t){ maintMsg.textContent = t; }
+
+settingsPanel.querySelectorAll(".sw").forEach(b => b.onclick = () => saveSetting(b.dataset.k, !S[b.dataset.k]));
+settingsPanel.querySelectorAll(".seg").forEach(g => g.querySelectorAll(".tab").forEach(t => t.onclick = () => saveSetting(g.dataset.k, Number(t.dataset.v))));
+$("btnSettings").onclick = () => { guide.hidden = true; say(""); paintSettings(); settingsPanel.hidden = false; };
+$("settingsClose").onclick = () => { settingsPanel.hidden = true; };
+settingsPanel.addEventListener("click", e => { if (e.target === settingsPanel) settingsPanel.hidden = true; });
+
+$("folderBtns").querySelectorAll(".tab").forEach(b => b.onclick = async () => {
+  if (!(api && api.openFivemFolder)) return say("Bu özellik sadece launcher uygulamasında çalışır.");
+  const f = b.dataset.f; let r = null;
+  try { r = await api.openFivemFolder(f); } catch {}
+  say(!r ? "Klasör açılamadı."
+    : r.ok ? (r.created ? f + " klasörü yoktu, oluşturuldu ve açıldı." : "")
+    : r.reason === "notfound" ? "FiveM klasörü bulunamadı. FiveM'i en az bir kez çalıştırmış olmalısın."
+    : "Klasör açılamadı. Kayıt dosyasına bakabilirsin.");
+});
+$("openLog").onclick = () => { if (api && api.openLog) api.openLog(); else say("Bu özellik sadece launcher uygulamasında çalışır."); };
+$("resetSettings").onclick = async () => {
+  S = Object.assign({}, DEFAULTS);
+  if (api && api.resetSettings) { try { Object.assign(S, await api.resetSettings()); } catch {} }
+  applySettings(); paintSettings(); say("Ayarlar varsayılana döndürüldü.");
+};
+$("clearCache").onclick = async () => {
+  const b = $("clearCache");
+  if (!(api && api.clearFivemCache)) return say("Bu özellik sadece launcher uygulamasında çalışır.");
+  if (!cacheArm) {                       // ilk tık: onay iste
+    b.textContent = "Emin misin? Tekrar tıkla"; b.classList.add("arm");
+    cacheArm = setTimeout(() => { cacheArm = null; b.textContent = "Temizle"; b.classList.remove("arm"); }, 4000);
+    return;
+  }
+  clearTimeout(cacheArm); cacheArm = null; b.textContent = "Temizle"; b.classList.remove("arm");
+  b.disabled = true; say("Temizleniyor…");
+  let r = null; try { r = await api.clearFivemCache(); } catch {}
+  b.disabled = false;
+  if (!r) return say("Temizleme sırasında hata oluştu.");
+  say(r.ok ? (r.cleared ? "Önbellek temizlendi. İlk bağlanışta sunucu dosyaları yeniden indirilecek." : "Temizlenecek önbellek bulunamadı.")
+    : r.reason === "running" ? "FiveM açıkken temizlenemez. Önce FiveM'i kapat."
+    : r.reason === "notfound" ? "FiveM klasörü bulunamadı."
+    : "Temizleme sırasında hata oluştu. Kayıt dosyasına bakabilirsin.");
+};
+
+const settingsReady = (api && api.getSettings) ? api.getSettings().then(s => { Object.assign(S, s); }).catch(() => {}) : Promise.resolve();
+
 if (api && api.onConnectReset) api.onConnectReset(() => {
-  connectingUi = false;
+  connectingUi = false; inGame = false;
   renderConnect();
 });
+// Tepsiden launcher açıldığında oyun sürüyorsa buton "Oyundasın" olur
+if (api && api.onGameState) api.onGameState(on => { inGame = on; renderConnect(); });
+// Tepsi menüsünden Discord durumu değişirse ayarlar penceresi de güncellensin
+if (api && api.onSettingsChanged) api.onSettingsChanged(s => { Object.assign(S, s); applySettings(); paintSettings(); });
 
 const verReady = (api && api.version) ? api.version().then(v => { $("ver").textContent = "v" + v; }).catch(() => {}) : Promise.resolve();
 
 $("peakAll").textContent = CONFIG.allTimeBase;
 refresh();
 updateCheck();
-setInterval(refresh, CONFIG.checkSeconds * 1000);
+settingsReady.then(() => { applySettings(); paintSettings(); });
 </script>
 </body>
 </html>
