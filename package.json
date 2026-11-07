@@ -19,7 +19,7 @@
   "build": {
     "appId": "world.gta.tr.launcher",
     "productName": "GTA World Turkiye Launcher",
-    "artifactName": "GTA-World-Türkiye-Launcher-Setup-v${version}.exe",
+    "artifactName": "GTA-World-Turkiye-Launcher-Setup-v${version}.exe",
     "files": [
       "main.js",
       "preload.js",
