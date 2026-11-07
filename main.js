@@ -15,7 +15,9 @@ const CFG = {
   joinUrl: "https://cfx.re/join/3yybopy",
   discordUrl: "https://discord.gg/gtaworldtr",
   infoLine: "forum-tr.gta.world",
-  fallbackMs: 120000                             
+  fallbackMs: 120000,
+  closeDelayMs: 4000,                            // 'Sunucuya Bağlan'dan kaç ms sonra tepsiye inilsin
+  noStartMs: 20000                               // FiveM bu sürede hiç başlamazsa launcher geri gelir                             
 };
 
 // ---- Log: %APPDATA%\gtaworld-tr-launcher\launcher.log ----
@@ -46,7 +48,57 @@ function saveSettings() {
 }
 let settings = loadSettings();
 
-let win = null, tray = null, quitting = false, keepAlive = false, splashShown = false;
+// ---- Oynama süresi: %APPDATA%\\gtaworld-tr-launcher\\playtime.json ----
+// Sayaç launcher'ın kurulduğu andan başlar (UCP'den geçmiş veri çekilemiyor). Gün gün saklanır, hafta/ay buradan hesaplanır.
+const PLAY_FILE = path.join(app.getPath("userData"), "playtime.json");
+const pad2 = (n) => String(n).padStart(2, "0");
+const dayKey = (d) => d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+function loadPlay() {
+  let s = {};
+  try { s = JSON.parse(fs.readFileSync(PLAY_FILE, "utf8")); } catch {}
+  const days = {};
+  if (s.days && typeof s.days === "object") for (const [k, v] of Object.entries(s.days)) if (/^\d{4}-\d{2}-\d{2}$/.test(k) && Number.isFinite(v) && v >= 0) days[k] = Math.floor(v);
+  const a = s.anchor;   // UCP'deki toplam saat: { sec: girilen süre, tracked: o an launcher'ın ölçtüğü toplam }
+  const anchor = a && Number.isFinite(a.sec) && a.sec >= 0 && Number.isFinite(a.tracked) && a.tracked >= 0 ? { sec: Math.floor(a.sec), tracked: Math.floor(a.tracked) } : null;
+  return {
+    total: Number.isFinite(s.total) && s.total >= 0 ? Math.floor(s.total) : 0, days, anchor,
+    lastOnline: Number.isFinite(s.lastOnline) && s.lastOnline > 0 ? Math.floor(s.lastOnline) : 0,
+    since: typeof s.since === "string" && !isNaN(Date.parse(s.since)) ? s.since : new Date(Date.now()).toISOString()
+  };
+}
+function savePlay() { try { fs.writeFileSync(PLAY_FILE, JSON.stringify(play)); } catch (e) { log("oynama süresi kaydedilemedi: " + e.message); } }
+let play = loadPlay();
+if (!fs.existsSync(PLAY_FILE)) savePlay();
+function playStats(now = new Date(Date.now())) {
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));   // hafta pazartesi başlar
+  const wk = dayKey(monday), td = dayKey(now), mo = td.slice(0, 7);
+  let week = 0, month = 0;
+  for (const [k, v] of Object.entries(play.days)) { if (k > td) continue; if (k >= wk) week += v; if (k.slice(0, 7) === mo) month += v; }   // bugünden sonrası (saat geri alınırsa) sayılmaz
+  const total = play.anchor ? play.anchor.sec + Math.max(0, play.total - play.anchor.tracked) : play.total;   // UCP saati girildiyse üstüne eklemeye devam eder
+  return { week, month, total, tracked: play.total, since: play.since, lastOnline: play.lastOnline, online: lastCredit > 0 };
+}
+let lastCredit = 0;   // 0: şu an sayılmıyor
+function sendPlayStats() { if (live()) win.webContents.send("play-stats", playStats()); }
+// joined=true iken çağrıldıkça son çağrıdan bu yana geçen süreyi ekler. Uyku/duraklama gibi uzun boşlukları saymaz.
+function creditPlay(joined) {
+  const t = Date.now();
+  if (!joined) { if (lastCredit) { lastCredit = 0; sendPlayStats(); } return; }   // sunucudan çıkıldı
+  play.lastOnline = t;
+  if (!lastCredit) { lastCredit = t; savePlay(); sendPlayStats(); return; }
+  let sec = Math.round((t - lastCredit) / 1000);
+  lastCredit = t;
+  if (sec <= 0) return;
+  if (sec > 40) sec = 10;
+  play.total += sec;
+  const k = dayKey(new Date(t));
+  play.days[k] = (play.days[k] || 0) + sec;
+  const cutoff = dayKey(new Date(t - 70 * 86400000));
+  for (const d of Object.keys(play.days)) if (d < cutoff) delete play.days[d];
+  savePlay();
+  sendPlayStats();
+}
+
+let win = null, tray = null, quitting = false, keepAlive = false, splashShown = false, closeTimer = null, noticePending = null;
 let launcherRpc = null, gameRpc = null, gameTimer = null, phase = "idle", closeAfterConnect = false;
 const startedAt = Date.now();
 const live = () => win && !win.isDestroyed();
@@ -89,12 +141,13 @@ async function updateGame() {
   });
 }
 let gameStart = 0;
-function switchToGame() {
+function switchToGame(joined) {
+  lastCredit = 0; creditPlay(!!joined);
   phase = "game"; gameStart = Date.now(); log("oyun işlemi bulundu, oyun RPC'sine geçildi");
   if (launcherRpc) { launcherRpc.destroy(); launcherRpc = null; }
   if (settings.discordRpc) { gameRpc = rpcClient(CFG.gameAppId); updateGame(); }
   gameTimer = setInterval(updateGame, 30000);
-  if (closeAfterConnect && live()) setTimeout(closeWindowKeepRpc, 1500);   
+  if (live()) win.webContents.send("game-state", "game");
 }
 
 
@@ -107,7 +160,7 @@ async function fivemProcs(cb) {
     title = names.find(joinedTitle) || names.find((n) => /fivem/i.test(n)) || "";
   } catch (e) { if (procErrCount++ < 3) log("pencere listesi hatası: " + e.message); }
   exec("tasklist /NH /FO CSV", { windowsHide: true, timeout: 15000, maxBuffer: 8 * 1024 * 1024 }, (err, out) =>
-    cb(err ? null : { game: /"FiveM_[^"]*GTAProcess/i.test(String(out)), title }));
+    cb(err ? null : { game: /"FiveM_[^"]*GTAProcess/i.test(String(out)), any: /"FiveM[^"]*\.exe"/i.test(String(out)), title }));
 }
 const joinedTitle = (t) => /fivem.{0,4}by cfx\.re\s*[-–—]\s*\S/i.test(t || "");
 function backToLauncher() {
@@ -121,23 +174,44 @@ function backToLauncher() {
   if (live()) win.webContents.send("connect-reset");
 }
 function endSession(why) {
-  phase = "idle";
-  if (!live() || !win.isVisible()) return quitApp(why);
+  log("oturum bitti: " + why + " -> launcher geri getiriliyor");
+  phase = "idle"; lastCredit = 0; clearTimeout(closeTimer); closeTimer = null;
+  openLauncher();      // pencere tepsideyse/kapalıysa geri getirir
+  backToLauncher();    // tepsiyi kaldırır, Discord durumunu ve butonu sıfırlar
+  sendPlayStats();
+}
+// FiveM hiç açılmadıysa launcher'ı geri getirir ve uyarı gösterir
+function sendNotice() {
+  if (noticePending && live() && !win.webContents.isLoading()) { win.webContents.send("notice", noticePending); noticePending = null; }
+}
+function connectFailed() {
+  log("FiveM " + CFG.noStartMs / 1000 + " sn içinde başlamadı, launcher geri getirildi");
+  phase = "idle"; clearTimeout(closeTimer); closeTimer = null;
+  noticePending = "no-start";
+  openLauncher();
   backToLauncher();
+  sendNotice();
 }
 function startWatch() {
   const t0 = Date.now();
-  let gameSince = 0, lastTitle = null;
+  let gameSince = 0, lastTitle = null, seenFivem = false, lastSeen = 0;
   const tick = () => {
     if (quitting || phase === "idle") return;
     fivemProcs((p) => {
       if (p) {
+        if (p.any || p.game) { seenFivem = true; lastSeen = Date.now(); }
         if (phase === "connecting" && p.game) {
           if (!gameSince) { gameSince = Date.now(); log("oyun işlemi başladı"); }
           if (p.title !== lastTitle) { lastTitle = p.title; log("oyun penceresi başlığı: " + p.title); }
-          if (joinedTitle(p.title)) { log("sunucuya girildi (başlıktan)"); return switchToGame(), setTimeout(tick, 10000); }
-          if (Date.now() - gameSince > CFG.fallbackMs) { log("başlıktan anlaşılamadı, süre dolduğu için geçildi"); return switchToGame(), setTimeout(tick, 10000); }
+          if (joinedTitle(p.title)) { log("sunucuya girildi (başlıktan)"); return switchToGame(true), setTimeout(tick, 10000); }
+          if (Date.now() - gameSince > CFG.fallbackMs) { log("başlıktan anlaşılamadı, süre dolduğu için geçildi"); return switchToGame(false), setTimeout(tick, 10000); }
         } else if (phase === "game" && !p.game) return endSession("FiveM kapandı");
+        else if (phase === "game") creditPlay(joinedTitle(p.title));          // sadece başlık sunucuyu gösterirken say
+      }
+      if (p && phase === "connecting") {
+        const running = p.any || p.game;
+        if (!seenFivem && Date.now() - t0 > CFG.noStartMs) return connectFailed();                       // hiç başlamadı
+        if (seenFivem && !running && Date.now() - lastSeen > 15000) return endSession("FiveM bağlanmadan kapandı"); // başladı ama kapandı
       }
       if (phase === "connecting" && Date.now() - t0 > 600000) return endSession("FiveM başlamadı");
       setTimeout(tick, phase === "game" ? 10000 : 4000);
@@ -160,7 +234,10 @@ function create() {
   const showSplash = settings.splash && !splashShown;
   splashShown = true;
   win.loadFile("index.html", showSplash ? undefined : { query: { nosplash: "1" } });
-  win.webContents.on("did-finish-load", () => { if (phase === "game" && live()) win.webContents.send("game-state", true); });
+  win.webContents.on("did-finish-load", () => {
+    if ((phase === "game" || phase === "connecting") && live()) win.webContents.send("game-state", phase);
+    sendNotice();
+  });
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https:\/\//.test(url)) shell.openExternal(url);
     return { action: "deny" };
@@ -217,7 +294,6 @@ function openLauncher() {
 }
 
 function closeWindowKeepRpc() {
-  if (!settings.discordRpc) return quitApp("bağlanınca kapat (Discord durumu kapalı)");
   if (!ensureTray()) { log("tepsi kurulamadı, pencere açık bırakıldı"); return; }
   keepAlive = true;
   if (live()) win.destroy();
@@ -237,6 +313,18 @@ function updateSettings(patch, notifyWindow) {
   if (notifyWindow && live()) win.webContents.send("settings-changed", settings);
   return settings;
 }
+ipcMain.handle("play-stats", () => playStats());
+// UCP'deki "Toplam Aktivite" saatini girer (örn. "1610.6", "1610,6 saat"). Boş bırakılırsa sadece launcher'ın ölçtüğü süre kullanılır.
+ipcMain.handle("play-set-total", (_e, v) => {
+  const s = (v == null ? "" : String(v)).trim().replace(/\s*(saat|sa|h)\.?$/i, "").replace(",", ".").trim();
+  if (s === "") play.anchor = null;
+  else {
+    if (!/^\d{1,6}(\.\d{1,2})?$/.test(s) || parseFloat(s) > 200000) return { ok: false };
+    play.anchor = { sec: Math.round(parseFloat(s) * 3600), tracked: play.total };
+  }
+  savePlay(); sendPlayStats();
+  return { ok: true, stats: playStats() };
+});
 ipcMain.handle("settings-set", (_e, patch) => updateSettings(patch, false));
 ipcMain.handle("settings-reset", () => {
   const prev = settings;
@@ -299,7 +387,7 @@ ipcMain.handle("fivem-clear-cache", async () => {
 });
 ipcMain.on("minimize", () => live() && win.minimize());
 ipcMain.on("close", () => {
-  if (tray && phase === "game" && live()) { log("pencere tepsiye alındı"); win.destroy(); return; }
+  if (tray && (phase === "game" || phase === "connecting") && live()) { log("pencere tepsiye alındı"); win.destroy(); return; }
   quitApp("kapat butonu");
 });
 ipcMain.on("open-external", (_e, url, opts) => {
@@ -314,8 +402,10 @@ ipcMain.on("open-external", (_e, url, opts) => {
       p.on("error", () => shell.openExternal(url));
       p.unref();
     } catch { shell.openExternal(url); }
-    phase = "connecting"; startWatch();
+    if (phase !== "connecting") { phase = "connecting"; startWatch(); }
     closeAfterConnect = settings.closeAfterConnect;
+    clearTimeout(closeTimer);
+    if (closeAfterConnect) closeTimer = setTimeout(() => { if ((phase === "connecting" || phase === "game") && live()) closeWindowKeepRpc(); }, CFG.closeDelayMs);
   }
 });
 
@@ -388,4 +478,4 @@ app.on("before-quit", () => {
   clearInterval(gameTimer);
   try { launcherRpc && launcherRpc.destroy(); gameRpc && gameRpc.destroy(); tray && tray.destroy(); } catch {}
 });
-app.on("window-all-closed", () => { if (keepAlive && phase === "game") log("pencere kapandı, arka planda devam"); else quitApp("window-all-closed"); });
+app.on("window-all-closed", () => { if (keepAlive && (phase === "game" || phase === "connecting")) log("pencere kapandı, arka planda devam"); else quitApp("window-all-closed"); });

@@ -14,7 +14,11 @@ contextBridge.exposeInMainWorld("launcher", {
   resetSettings: () => ipcRenderer.invoke("settings-reset"),
   openLog: () => ipcRenderer.invoke("open-log"),
   onSettingsChanged: (cb) => ipcRenderer.on("settings-changed", (_e, s) => cb(s)),
-  onGameState: (cb) => ipcRenderer.on("game-state", (_e, on) => cb(!!on)),
+  onGameState: (cb) => ipcRenderer.on("game-state", (_e, phase) => cb(phase)),
+  onNotice: (cb) => ipcRenderer.on("notice", (_e, n) => cb(n)),
+  getPlayStats: () => ipcRenderer.invoke("play-stats"),
+  setPlayTotal: (hours) => ipcRenderer.invoke("play-set-total", hours),
+  onPlayStats: (cb) => ipcRenderer.on("play-stats", (_e, s) => cb(s)),
   openFivemFolder: (name) => ipcRenderer.invoke("fivem-open-folder", name),
   clearFivemCache: () => ipcRenderer.invoke("fivem-clear-cache")
 });

@@ -9,8 +9,9 @@ GTA World Türkiye sunucusuna tek tıkla bağlanmak için hazırlanmış masaüs
 - Yeni oyuncular için hesap açma ve başvuru rehberi
 - Discord Rich Presence (launcher ve oyun içi durum)
 - Otomatik güncelleme
-- Sunucuya bağlanınca tepside çalışır: sağ tık menüsünden Discord durumu aç/kapat, launcher'ı aç, kapat
-- GTA V tarzı açılış ekranı: logo, güncelleme kontrolü ve sunucu durumu adımları (Ayarlar'dan kapatılabilir, tıklayınca veya tuşa basınca atlanır)
+- Sunucuya Bağlan'a basınca 4 saniye sonra tepsiye iner. FiveM 20 saniyede açılmazsa launcher uyarıyla geri gelir, oyun kapanınca da launcher kendiliğinden geri gelir. Tepsi menüsü: Discord durumu aç/kapat, launcher'ı aç, kapat
+- Oynama süresi: bu hafta / bu ay / genel (oyun başlığı sunucuya girildiğini gösterince sayılır). Genel süreye tıklayıp UCP'deki Toplam Aktivite saatini girebilirsin, launcher üstüne eklemeye devam eder. Altında "en son online ... önce" yazar
+- GTA V tarzı açılış ekranı: şehir zemini, logo ve sağ alt köşede adım adım durum yazıları (Ayarlar'dan kapatılabilir, tıklayınca veya tuşa basınca atlanır)
 - Ayarlar penceresi: Discord durumu, bağlanınca kapat, arka plan ve yenileme seçenekleri, FiveM önbellek temizleme
 
 ## İndirme ve kurulum
