@@ -10,6 +10,7 @@ GTA World Türkiye sunucusuna tek tıkla bağlanmak için hazırlanmış masaüs
 - Discord Rich Presence (launcher ve oyun içi durum)
 - Otomatik güncelleme
 - Sunucuya bağlanınca tepside çalışır: sağ tık menüsünden Discord durumu aç/kapat, launcher'ı aç, kapat
+- GTA V tarzı açılış ekranı: logo, güncelleme kontrolü ve sunucu durumu adımları (Ayarlar'dan kapatılabilir, tıklayınca veya tuşa basınca atlanır)
 - Ayarlar penceresi: Discord durumu, bağlanınca kapat, arka plan ve yenileme seçenekleri, FiveM önbellek temizleme
 
 ## İndirme ve kurulum

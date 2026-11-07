@@ -25,10 +25,11 @@ process.on("uncaughtException", (e) => log("HATA: " + (e && e.stack || e)));
 
 // ---- Kullanıcı ayarları: %APPDATA%\\gtaworld-tr-launcher\\settings.json ----
 const SETTINGS_FILE = path.join(app.getPath("userData"), "settings.json");
-const DEFAULTS = { closeAfterConnect: true, discordRpc: true, bgSlideshow: true, bgSeconds: 8, refreshSeconds: 30 };
+const DEFAULTS = { closeAfterConnect: true, discordRpc: true, splash: true, bgSlideshow: true, bgSeconds: 8, refreshSeconds: 30 };
 const RULES = {
   closeAfterConnect: (v) => typeof v === "boolean",
   discordRpc: (v) => typeof v === "boolean",
+  splash: (v) => typeof v === "boolean",
   bgSlideshow: (v) => typeof v === "boolean",
   bgSeconds: (v) => [5, 8, 15].includes(v),
   refreshSeconds: (v) => [15, 30, 60].includes(v)
@@ -45,7 +46,7 @@ function saveSettings() {
 }
 let settings = loadSettings();
 
-let win = null, tray = null, quitting = false, keepAlive = false;
+let win = null, tray = null, quitting = false, keepAlive = false, splashShown = false;
 let launcherRpc = null, gameRpc = null, gameTimer = null, phase = "idle", closeAfterConnect = false;
 const startedAt = Date.now();
 const live = () => win && !win.isDestroyed();
@@ -155,7 +156,10 @@ function create() {
     webPreferences: { preload: path.join(__dirname, "preload.js"), webSecurity: false }
   });
   win.setMenu(null);
-  win.loadFile("index.html");
+  // Açılış ekranı sadece uygulama ilk açılışında gösterilir (tepsiden tekrar açılışta atlanır)
+  const showSplash = settings.splash && !splashShown;
+  splashShown = true;
+  win.loadFile("index.html", showSplash ? undefined : { query: { nosplash: "1" } });
   win.webContents.on("did-finish-load", () => { if (phase === "game" && live()) win.webContents.send("game-state", true); });
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https:\/\//.test(url)) shell.openExternal(url);
