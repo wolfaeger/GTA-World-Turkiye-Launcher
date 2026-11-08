@@ -436,25 +436,32 @@ function setUpdating(on){
   renderConnect();
 }
 let checkState; const checkReady = new Promise(res => { checkState = res; });
+// Döndürdüğü sonuç: current / dev / error / installing (indirildi, uygulama yeniden başlayacak) / failed / demo
 async function updateCheck(){
   await verReady;
   const before = $("ver").textContent;
   const demo = (location.search.match(/update=(\w+)/) || [])[1];
   let r = null;
   if (demo) r = { state: demo === "new" ? "new" : "current", version: "v1.0.1" };
-  else if (api && api.checkUpdate) { try { r = await api.checkUpdate(); } catch { checkState("none"); return; } }
+  else if (api && api.checkUpdate) { try { r = await api.checkUpdate(); } catch { r = { state: "error" }; } }
   checkState(r && r.state);
-  if (!r) return;
-  if (r.state === "current") return updStatus("ok", "Güncel");
-  if (r.state !== "new") return;                      
+  if (!r) return "none";
+  if (r.state === "current") { updStatus("ok", "Güncel"); return "current"; }
+  if (r.state === "dev") { updStatus("ok", "Geliştirme sürümü"); return "dev"; }
+  if (r.state !== "new") { updStatus("warn", "Güncelleme kontrolü yapılamadı."); return "error"; }
   updStatus("warn", "Yeni güncelleme geldi, launcher güncelleniyor.");
   if (r.version) $("ver").textContent = "v" + String(r.version).replace(/^v/i, "");
-  if (demo || !(api && api.applyUpdate)) return;
+  if (demo || !(api && api.applyUpdate)) return "demo";
   setUpdating(true);
-  const res = await api.applyUpdate();               
+  let res = null; try { res = await api.applyUpdate(); } catch {}
+  if (res && (res.ok || res.opened)) {               // indirildi: uygulama birazdan kendini yeniden başlatır, buton kapalı kalsın
+    updStatus("ok", "Güncelleme yüklendi, launcher yeniden başlatılıyor.");
+    return "installing";
+  }
   setUpdating(false);
   $("ver").textContent = before;
-  updStatus("warn", res && res.opened ? "Yeni güncelleme var, launcher güncelleniyor." : "Güncelleme yapılamadı, daha sonra tekrar deneyin.");
+  updStatus("warn", "Güncelleme yapılamadı, daha sonra tekrar deneyin.");
+  return "failed";
 }
 
 
@@ -620,11 +627,15 @@ async function runSplash(updateP, refreshP){
   try {
     await hold(Promise.all([settingsReady, verReady]), SPLASH.first, 3000);          // Yükleniyor…
     const st = await go("Güncellemeler kontrol ediliyor…", checkReady);
-    let msg = "Güncelleme kontrolü sağlandı…";
-    if (st === "new") {                                                              // yeni sürüm: indirme bitene kadar bekle, başarılıysa uygulama yeniden başlar
-      await go("Güncelleme tespit edildi, yükleniyor…", updateP, 0, 10 * 60 * 1000);
-      msg = "Güncelleme yüklenemedi…";
-    } else if (st !== "current") msg = "Güncelleme kontrolü yapılamadı…";
+    let msg = { current: "Güncelleme kontrolü sağlandı…", dev: "Geliştirme sürümü, güncelleme kontrolü atlandı…", error: "Güncelleme kontrolü yapılamadı…" }[st]
+      || (st === undefined ? "Güncelleme kontrolü uzadı, arka planda sürüyor…" : "Güncelleme kontrolü tamamlandı…");
+    if (st === "new") {                                                              // yeni sürüm: indirme bitene kadar bekle
+      const out = await go("Güncelleme tespit edildi, yükleniyor…", updateP, 0, 10 * 60 * 1000);
+      if (out === "installing") {                                                    // indirildi: uygulama birazdan kendini yeniden başlatır, launcher'ı açma
+        await go("Güncelleme yüklendi, launcher yeniden başlatılıyor…", null, 20000);
+        msg = "Güncelleme kurulumu tamamlanmadı…";
+      } else msg = out === "failed" ? "Güncelleme yüklenemedi…" : "Güncelleme tamamlanamadı…";
+    }
     await go(msg);
     await go("Sunucu durumu alınıyor…", refreshP, SPLASH.step, 4500);              // sunucu durumu gerçekten gelsin
     await go("Launcher hazırlanıyor…");

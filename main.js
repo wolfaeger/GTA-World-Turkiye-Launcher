@@ -442,18 +442,24 @@ function isNewer(a, b) {
 }
 let pendingUpdate = null;
 
+// Durumlar: dev (paketlenmemiş sürüm, kontrol yapılmaz) / current / new / error (ağ hatası vb., bir kez daha denenir)
 ipcMain.handle("update-check", async () => {
-  if (!app.isPackaged) return { state: "none" };           
-  try {
-    const r = await autoUpdater.checkForUpdates();
-    const info = r && r.updateInfo;
-    log("sürüm kontrolü: mevcut " + app.getVersion() + ", son " + (info && info.version));
-    if (!info || !isNewer(info.version, app.getVersion())) return { state: "current" };
-    pendingUpdate = info;
-    return { state: "new", version: info.version };
-  } catch (e) { log("sürüm kontrolü hatası: " + e.message); return { state: "none" }; }
+  if (!app.isPackaged) return { state: "dev" };
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const r = await autoUpdater.checkForUpdates();
+      const info = r && r.updateInfo;
+      log("sürüm kontrolü: mevcut " + app.getVersion() + ", son " + (info && info.version));
+      if (!info || !isNewer(info.version, app.getVersion())) return { state: "current" };
+      pendingUpdate = info;
+      return { state: "new", version: info.version };
+    } catch (e) {
+      log("sürüm kontrolü hatası (deneme " + attempt + "/2): " + e.message);
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 1500));
+    }
+  }
+  return { state: "error" };
 });
-
 
 ipcMain.handle("update-apply", async () => {
   if (!pendingUpdate) return { ok: false };
